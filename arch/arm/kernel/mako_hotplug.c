@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Francisco Franco <franciscofranco.1990@gmail.com>. 
+ * Copyright (c) 2013-2014, Francisco Franco <franciscofranco.1990@gmail.com>.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -27,198 +27,193 @@
 #include <linux/delay.h>
 #include <linux/input.h>
 #include <linux/jiffies.h>
-
 #include <linux/lcd_notify.h>
-
 
 #define MAKO_HOTPLUG "mako_hotplug"
 
-#define DEFAULT_LOAD_THRESHOLD 60
+#define DEFAULT_LOAD_THRESHOLD 70
 #define DEFAULT_HIGH_LOAD_COUNTER 10
 #define DEFAULT_MAX_LOAD_COUNTER 20
-#define DEFAULT_CPUFREQ_UNPLUG_LIMIT 1000000
+#define DEFAULT_CPUFREQ_UNPLUG_LIMIT 1500000
 #define DEFAULT_MIN_TIME_CPU_ONLINE 1
 #define DEFAULT_TIMER 1
 
-static struct cpu_stats
+#define MIN_CPU_UP_US 1000 * USEC_PER_MSEC;
+#define NUM_POSSIBLE_CPUS num_possible_cpus()
+#define HIGH_LOAD 95
+
+extern bool boosted;
+
+struct cpu_stats
 {
+	unsigned int online_cpus;
 	unsigned int counter[2];
-	unsigned long timestamp[2];
 	struct notifier_block notif;
+	u64 timestamp[2];
 } stats = {
 	.counter = {0},
 };
 
 struct hotplug_tunables
 {
-	/* 
-	 * system load threshold to decide when online or offline cores 
+	/*
+	 * system load threshold to decide when online or offline cores
 	 * from 0 to 100
 	 */
 	unsigned int load_threshold;
 
-	/* 
+	/*
 	 * counter to filter online/offline calls. The load needs to be above
 	 * load_threshold X high_load_counter times for the cores to go online
 	 * otherwise they stay offline
 	 */
 	unsigned int high_load_counter;
 
-	/* 
+	/*
 	 * max number of samples counters allowed to be counted. The higher the
 	 * value the longer it will take the driver to offline cores after a period
 	 * of high and continuous load
 	 */
 	unsigned int max_load_counter;
 
-	/* 
-	 * if the current CPU freq is above this limit don't offline the cores 
+	/*
+	 * if the current CPU freq is above this limit don't offline the cores
 	 * for a couple of extra samples
 	 */
 	unsigned int cpufreq_unplug_limit;
 
-	/* 
+	/*
 	 * minimum time in seconds that a core stays online to avoid too many
 	 * online/offline calls
 	 */
 	unsigned int min_time_cpu_online;
 
-	/* 
+	/*
 	 * sample timer in seconds. The default value of 1 equals to 10 samples
 	 * every second. The higher the value the less samples per second it runs
 	 */
 	unsigned int timer;
 } tunables;
 
-struct cpu_load_data {
-	u64 prev_cpu_idle;
-	u64 prev_cpu_wall;
-};
-
-static DEFINE_PER_CPU(struct cpu_load_data, cpuload);
-
 static struct workqueue_struct *wq;
 static struct delayed_work decide_hotplug;
-static struct work_struct suspend;
-static struct work_struct resume;
+static struct work_struct suspend, resume;
 
-static inline int get_cpu_load(unsigned int cpu)
+static void cpu_revive(unsigned int cpu, unsigned int load)
 {
-	struct cpu_load_data *pcpu = &per_cpu(cpuload, cpu);
-	struct cpufreq_policy policy;
-	u64 cur_wall_time, cur_idle_time;
-	unsigned int idle_time, wall_time;
-	unsigned int cur_load;
+	struct hotplug_tunables *t = &tunables;
 
-	cpufreq_get_policy(&policy, cpu);
+	/*
+	 * we should care about a very high load spike and online the
+	 * cpu in question. If the device is under stress for at least 200ms
+	 * online the cpu, no questions asked. 200ms here equals two samples
+	 */
+	if (load >= HIGH_LOAD && stats.counter[cpu - 2] >= 2)
+	{
+		cpu_up(cpu);
+	}
+	else if (stats.counter[cpu - 2] >= t->high_load_counter)
+	{
+		cpu_up(cpu);
+		stats.timestamp[cpu - 2] = ktime_to_us(ktime_get());
+	}
 
-	cur_idle_time = get_cpu_idle_time(cpu, &cur_wall_time, true);
-
-	wall_time = (unsigned int) (cur_wall_time - pcpu->prev_cpu_wall);
-	pcpu->prev_cpu_wall = cur_wall_time;
-
-	idle_time = (unsigned int) (cur_idle_time - pcpu->prev_cpu_idle);
-	pcpu->prev_cpu_idle = cur_idle_time;
-
-	if (unlikely(!wall_time || wall_time < idle_time))
-		return 0;
-
-	cur_load = 100 * (wall_time - idle_time) / wall_time;
-
-	return (cur_load * policy.cur) / policy.max;
-}
-
-static void cpu_revive(unsigned int cpu)
-{
-	cpu_up(cpu);
-	stats.timestamp[cpu - 2] = jiffies;
+	stats.online_cpus = num_online_cpus();
 }
 
 static void cpu_smash(unsigned int cpu)
 {
 	struct hotplug_tunables *t = &tunables;
+	u64 extra_time = MIN_CPU_UP_US;
+
+	/*
+	 * offline the cpu only if its freq is lower than
+	 * CPUFREQ_UNPLUG_LIMIT. Else update the timestamp to now and
+	 * postpone the cpu offline process to at least another second
+	 */
+	if (cpufreq_quick_get(cpu) >= t->cpufreq_unplug_limit
+			&& !boosted)
+		stats.timestamp[cpu - 2] = ktime_to_us(ktime_get());
 
 	/*
 	 * Let's not unplug this cpu unless its been online for longer than
 	 * 1sec to avoid consecutive ups and downs if the load is varying
 	 * closer to the threshold point.
 	 */
-	if (time_is_after_jiffies(stats.timestamp[cpu - 2] + 
-			(t->min_time_cpu_online * HZ)))
+	if (unlikely(t->min_time_cpu_online > 1))
+		extra_time = t->min_time_cpu_online * MIN_CPU_UP_US;
+
+	if (ktime_to_us(ktime_get()) < stats.timestamp[cpu - 2] + extra_time)
+		return;
+
+	if (stats.counter[cpu - 2] >= t->high_load_counter)
 		return;
 
 	cpu_down(cpu);
+
+	stats.online_cpus = num_online_cpus();
+
+	/*
+	 * reset the counter yo
+	 */
 	stats.counter[cpu - 2] = 0;
 }
 
 static void __ref decide_hotplug_func(struct work_struct *work)
 {
-	int cpu;
-	int cpu_nr = 2;
+	unsigned int cpu;
 	unsigned int cur_load;
-	unsigned int freq_buf;
-	struct cpufreq_policy policy;
 	struct hotplug_tunables *t = &tunables;
 
-	if (unlikely(num_online_cpus() == 1))
+	/*
+	 * reschedule early when the system has woken up from the FREEZER but the
+	 * display is not on
+	 */
+	if (unlikely(stats.online_cpus == 1))
 		goto reschedule;
 
-    for_each_online_cpu(cpu) 
-    {
-		cur_load = get_cpu_load(cpu);
+	/*
+	 * reschedule early when the user doesn't want more than 2 cores online
+	 */
+	if (unlikely(t->load_threshold == 100 && stats.online_cpus == 2))
+		goto reschedule;
+
+	/*
+	 * reschedule early when users to run with all cores online
+	 */
+	if (unlikely(!t->load_threshold && stats.online_cpus == NUM_POSSIBLE_CPUS))
+		goto reschedule;
+
+	for (cpu = 0; cpu < 2; cpu++)
+	{
+		cur_load = cpufreq_quick_get_util(cpu);
 
 		if (cur_load >= t->load_threshold)
 		{
-			if (likely(stats.counter[cpu] < t->max_load_counter))
-				stats.counter[cpu] += 2;
+			if (stats.counter[cpu] < t->max_load_counter)
+				++stats.counter[cpu];
 
-			if (cpu_is_offline(cpu_nr) 
-					&& stats.counter[cpu] >= t->high_load_counter)
-				cpu_revive(cpu_nr);
+			if (stats.online_cpus < NUM_POSSIBLE_CPUS)
+				cpu_revive(stats.online_cpus, cur_load);
 		}
-
 		else
 		{
 			if (stats.counter[cpu])
 				--stats.counter[cpu];
 
-			if (cpu_online(cpu_nr) && stats.counter[cpu] < t->high_load_counter)
-			{
-				/* 
-				 * offline the cpu only if its freq is lower than
-				 * CPUFREQ_UNPLUG_LIMIT. Else fill the counter so that this cpu
-				 * stays online at least 5 more samples (time depends on the
-				 * sample timer period)
-				 */
-				cpufreq_get_policy(&policy, cpu_nr);
-
-				freq_buf = policy.min;
-
-				if (policy.min > t->cpufreq_unplug_limit)
-					freq_buf = t->cpufreq_unplug_limit;
-
-				if (policy.cur > freq_buf)
-					stats.counter[cpu] = t->high_load_counter + 5;
-				else
-					cpu_smash(cpu_nr);
-			}
+			if (stats.online_cpus > 2)
+				cpu_smash(stats.online_cpus - 1);
 		}
-
-		cpu_nr++;
-
-		if (cpu)
-			break;
 	}
 
 reschedule:
-    queue_delayed_work_on(0, wq, &decide_hotplug, msecs_to_jiffies(t->timer * HZ));
+	queue_delayed_work_on(0, wq, &decide_hotplug,
+		msecs_to_jiffies(t->timer * HZ));
 }
 
 static void mako_hotplug_suspend(struct work_struct *work)
 {
 	int cpu;
-
-	pr_info("%s: suspend\n", MAKO_HOTPLUG);
 
 	stats.counter[0] = 0;
 	stats.counter[1] = 0;
@@ -230,13 +225,15 @@ static void mako_hotplug_suspend(struct work_struct *work)
 
 		cpu_down(cpu);
 	}
+
+	stats.online_cpus = num_online_cpus();
+
+	pr_info("%s: suspend\n", MAKO_HOTPLUG);
 }
 
 static void __ref mako_hotplug_resume(struct work_struct *work)
 {
 	int cpu;
-
-	pr_info("%s: resume\n", MAKO_HOTPLUG);
 
 	for_each_possible_cpu(cpu)
 	{
@@ -245,10 +242,14 @@ static void __ref mako_hotplug_resume(struct work_struct *work)
 
 		cpu_up(cpu);
 	}
+
+	stats.online_cpus = num_online_cpus();
+
+	pr_info("%s: resume\n", MAKO_HOTPLUG);
 }
 
 static int lcd_notifier_callback(struct notifier_block *this,
-									unsigned long event, void *data)
+	unsigned long event, void *data)
 {
 	if (event == LCD_EVENT_ON_START)
 		queue_work_on(0, wq, &resume);
@@ -262,155 +263,155 @@ static int lcd_notifier_callback(struct notifier_block *this,
  * Sysfs get/set entries start
  */
 
-static ssize_t load_threshold_show(struct device *dev, 
+static ssize_t load_threshold_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    return sprintf(buf, "%u\n", t->load_threshold);
+	return sprintf(buf, "%u\n", t->load_threshold);
 }
 
-static ssize_t load_threshold_store(struct device *dev, 
+static ssize_t load_threshold_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    unsigned int new_val;
-    
+	unsigned int new_val;
+
 	sscanf(buf, "%u", &new_val);
-    
-    if (new_val != t->load_threshold && new_val >= 0 && new_val <= 100)
-    {
-        t->load_threshold = new_val;
-    }
-    
-    return size;
+
+	if (new_val != t->load_threshold && new_val >= 0 && new_val <= 100)
+	{
+		t->load_threshold = new_val;
+	}
+
+	return size;
 }
 
-static ssize_t high_load_counter_show(struct device *dev, 
+static ssize_t high_load_counter_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    return sprintf(buf, "%u\n", t->high_load_counter);
+	return sprintf(buf, "%u\n", t->high_load_counter);
 }
 
-static ssize_t high_load_counter_store(struct device *dev, 
+static ssize_t high_load_counter_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    unsigned int new_val;
-    
+	unsigned int new_val;
+
 	sscanf(buf, "%u", &new_val);
-    
-    if (new_val != t->high_load_counter && new_val >= 0 && new_val <= 50)
-    {
-        t->high_load_counter = new_val;
-    }
-    
-    return size;
+
+	if (new_val != t->high_load_counter && new_val >= 0 && new_val <= 50)
+	{
+		t->high_load_counter = new_val;
+	}
+
+	return size;
 }
 
-static ssize_t max_load_counter_show(struct device *dev, 
+static ssize_t max_load_counter_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    return sprintf(buf, "%u\n", t->max_load_counter);
+	return sprintf(buf, "%u\n", t->max_load_counter);
 }
 
-static ssize_t max_load_counter_store(struct device *dev, 
+static ssize_t max_load_counter_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    unsigned int new_val;
-    
+	unsigned int new_val;
+
 	sscanf(buf, "%u", &new_val);
-    
-    if (new_val != t->max_load_counter && new_val >= 0 && new_val <= 50)
-    {
-        t->max_load_counter = new_val;
-    }
-    
-    return size;
+
+	if (new_val != t->max_load_counter && new_val >= 0 && new_val <= 50)
+	{
+		t->max_load_counter = new_val;
+	}
+
+	return size;
 }
 
-static ssize_t cpufreq_unplug_limit_show(struct device *dev, 
+static ssize_t cpufreq_unplug_limit_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    return sprintf(buf, "%u\n", t->cpufreq_unplug_limit);
+	return sprintf(buf, "%u\n", t->cpufreq_unplug_limit);
 }
 
-static ssize_t cpufreq_unplug_limit_store(struct device *dev, 
+static ssize_t cpufreq_unplug_limit_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    unsigned int new_val;
-    
+	unsigned int new_val;
+
 	sscanf(buf, "%u", &new_val);
-    
-    if (new_val != t->cpufreq_unplug_limit && 
-			new_val >= 0 && new_val <= UINT_MAX)
-    {
-        t->cpufreq_unplug_limit = new_val;
-    }
-    
-    return size;
+
+	if (new_val != t->cpufreq_unplug_limit &&
+		new_val >= 0 && new_val <= UINT_MAX)
+	{
+		t->cpufreq_unplug_limit = new_val;
+	}
+
+	return size;
 }
 
-static ssize_t min_time_cpu_online_show(struct device *dev, 
+static ssize_t min_time_cpu_online_show(struct device *dev,
 		struct device_attribute *attr, char *buf)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    return sprintf(buf, "%u\n", t->min_time_cpu_online);
+	return sprintf(buf, "%u\n", t->min_time_cpu_online);
 }
 
-static ssize_t min_time_cpu_online_store(struct device *dev, 
+static ssize_t min_time_cpu_online_store(struct device *dev,
 		struct device_attribute *attr, const char *buf, size_t size)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    unsigned int new_val;
-    
+	unsigned int new_val;
+
 	sscanf(buf, "%u", &new_val);
-    
-    if (new_val != t->min_time_cpu_online && new_val >= 0 && new_val <= 100)
-    {
-        t->min_time_cpu_online = new_val;
-    }
-    
-    return size;
+
+	if (new_val != t->min_time_cpu_online && new_val >= 0 && new_val <= 100)
+	{
+		t->min_time_cpu_online = new_val;
+	}
+
+	return size;
 }
 
-static ssize_t timer_show(struct device *dev, struct device_attribute *attr, 
+static ssize_t timer_show(struct device *dev, struct device_attribute *attr,
 		char *buf)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    return sprintf(buf, "%u\n", t->timer);
+	return sprintf(buf, "%u\n", t->timer);
 }
 
-static ssize_t timer_store(struct device *dev, struct device_attribute *attr, 
+static ssize_t timer_store(struct device *dev, struct device_attribute *attr,
 		const char *buf, size_t size)
 {
 	struct hotplug_tunables *t = &tunables;
 
-    unsigned int new_val;
-    
+	unsigned int new_val;
+
 	sscanf(buf, "%u", &new_val);
-    
-    if (new_val != t->timer && new_val >= 0 && new_val <= 100)
-    {
-        t->timer = new_val;
-    }
-    
-    return size;
+
+	if (new_val != t->timer && new_val >= 0 && new_val <= 100)
+	{
+		t->timer = new_val;
+	}
+
+	return size;
 }
 
 static DEVICE_ATTR(load_threshold, 0664, load_threshold_show, load_threshold_store);
@@ -455,8 +456,8 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 	int ret = 0;
 	struct hotplug_tunables *t = &tunables;
 
-	wq = alloc_workqueue("mako_hotplug_workqueue", WQ_HIGHPRI | WQ_FREEZABLE, 1);
-    
+	wq = alloc_workqueue("mako_hotplug_workqueue", WQ_FREEZABLE, 1);
+
 	if (!wq)
 	{
 		ret = -ENOMEM;
@@ -470,10 +471,10 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 	t->min_time_cpu_online = DEFAULT_MIN_TIME_CPU_ONLINE;
 	t->timer = DEFAULT_TIMER;
 
-	stats.timestamp[0] = jiffies;
-	stats.timestamp[1] = jiffies;
-
+	stats.timestamp[0] = ktime_to_us(ktime_get());
+	stats.timestamp[1] = ktime_to_us(ktime_get());
 	stats.notif.notifier_call = lcd_notifier_callback;
+	stats.online_cpus = num_online_cpus();
 
 	if (lcd_register_client(&stats.notif))
 	{
@@ -493,21 +494,19 @@ static int __devinit mako_hotplug_probe(struct platform_device *pdev)
 			&mako_hotplug_control_group);
 
 	if (ret)
-    {
+	{
 		ret = -EINVAL;
 		goto err;
 	}
 
-	INIT_WORK(&suspend, mako_hotplug_suspend);
 	INIT_WORK(&resume, mako_hotplug_resume);
+	INIT_WORK(&suspend, mako_hotplug_suspend);
 	INIT_DELAYED_WORK(&decide_hotplug, decide_hotplug_func);
 
 	queue_delayed_work_on(0, wq, &decide_hotplug, HZ * 20);
-    
-	return ret;
 
 err:
-	return ret;	
+	return ret;
 }
 
 static struct platform_device mako_hotplug_device = {
@@ -562,3 +561,4 @@ static void __exit mako_hotplug_exit(void)
 
 late_initcall(mako_hotplug_init);
 module_exit(mako_hotplug_exit);
+
