@@ -94,7 +94,7 @@
 /* Set to 3 to get tracing... */
 //                                                                                                        
 //#define ACONF_DEBUG 2 // The original value.
-#define ACONF_DEBUG 3 // To debug...
+#define ACONF_DEBUG 2 // To debug...
 //                                                                                                        
 
 #if ACONF_DEBUG >= 3
