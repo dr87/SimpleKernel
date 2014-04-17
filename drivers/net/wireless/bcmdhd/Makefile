@@ -274,7 +274,7 @@ endif
 
 # For BT LOCK
 ifeq ($(CONFIG_BCM4335BT),y)
-#  DHDCFLAGS += -DENABLE_4335BT_WAR
+  DHDCFLAGS += -DENABLE_4335BT_WAR
 endif
 endif
 
