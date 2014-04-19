@@ -1548,30 +1548,22 @@
 
 	qcom,msm-thermal {
 		compatible = "qcom,msm-thermal";
-		qcom,sensor-id = <5>;
+		qcom,sensor-id = <0>;
 		qcom,poll-ms = <250>;
-		qcom,limit-temp = <60>;
+		qcom,limit-temp = <80>;
 		qcom,temp-hysteresis = <10>;
 		qcom,freq-step = <2>;
 		qcom,freq-control-mask = <0xf>;
-		qcom,core-limit-temp = <80>;
+		qcom,core-limit-temp = <90>;
 		qcom,core-temp-hysteresis = <10>;
 		qcom,core-control-mask = <0xe>;
-		qcom,hotplug-temp = <110>;
-		qcom,hotplug-temp-hysteresis = <20>;
-		qcom,cpu-sensors = "tsens_tz_sensor5", "tsens_tz_sensor6",
-				"tsens_tz_sensor7", "tsens_tz_sensor8";
-		qcom,freq-mitigation-temp = <110>;
-		qcom,freq-mitigation-temp-hysteresis = <20>;
-		qcom,freq-mitigation-value = <960000>;
-		qcom,freq-mitigation-control-mask = <0x01>;
 		qcom,vdd-restriction-temp = <5>;
 		qcom,vdd-restriction-temp-hysteresis = <10>;
-		qcom,pmic-sw-mode-temp = <85>;
-		qcom,pmic-sw-mode-temp-hysteresis = <75>;
-		qcom,pmic-sw-mode-regs = "vdd-dig";
-		vdd-dig-supply = <&pm8841_s2_floor_corner>;
-		vdd-gfx-supply = <&pm8841_s4_floor_corner>;
+		qcom,pmic-sw-mode-temp = <95>;
+		qcom,pmic-sw-mode-temp-hysteresis = <85>;
+		qcom,pmic-sw-mode-regs = "vdd_dig";
+		vdd_dig-supply = <&pm8841_s2_floor_corner>;
+		vdd_gfx-supply = <&pm8841_s4_floor_corner>;
 
 		qcom,vdd-dig-rstr{
 			qcom,vdd-rstr-reg = "vdd-dig";
