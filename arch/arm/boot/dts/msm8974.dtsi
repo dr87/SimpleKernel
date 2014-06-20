@@ -1561,9 +1561,9 @@
 		qcom,vdd-restriction-temp-hysteresis = <10>;
 		qcom,pmic-sw-mode-temp = <95>;
 		qcom,pmic-sw-mode-temp-hysteresis = <85>;
-		qcom,pmic-sw-mode-regs = "vdd_dig";
-		vdd_dig-supply = <&pm8841_s2_floor_corner>;
-		vdd_gfx-supply = <&pm8841_s4_floor_corner>;
+		qcom,pmic-sw-mode-regs = "vdd-dig";
+		vdd-dig-supply = <&pm8841_s2_floor_corner>;
+		vdd-gfx-supply = <&pm8841_s4_floor_corner>;
 
 		qcom,vdd-dig-rstr{
 			qcom,vdd-rstr-reg = "vdd-dig";
