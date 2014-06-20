@@ -102,7 +102,7 @@ static void __init msm8974_early_memory(void)
 static struct msm_thermal_data msm_thermal_pdata = {
 	.sensor_id = 0,
 	.poll_ms = 400,
-	.shutdown_temp = 95,
+	.shutdown_temp = 110,
 
 	.allowed_max_high = 85,
 	.allowed_max_low = 81,
@@ -114,7 +114,7 @@ static struct msm_thermal_data msm_thermal_pdata = {
 
 	.allowed_low_high = 80,
 	.allowed_low_low = 75,
-	.allowed_low_freq = 1728000,
+	.allowed_low_freq = 1497600,
 };
 #endif
 
