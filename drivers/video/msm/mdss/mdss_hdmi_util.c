@@ -104,7 +104,7 @@ void hdmi_setup_video_mode_lut(void)
 	MSM_HDMI_MODES_SET_SUPP_TIMINGS(
 		hdmi_supported_video_mode_lut, MSM_HDMI_MODES_CEA);
 
-/*                                                    */
+/*LGE_CHANGE : Disable Not-Supported Timing by anx7808*/
 	/* Add all supported extended hdmi modes to the lut */
 	/*MSM_HDMI_MODES_SET_SUPP_TIMINGS(
 		hdmi_supported_video_mode_lut, MSM_HDMI_MODES_XTND);*/
@@ -124,30 +124,30 @@ const char *hdmi_get_single_video_3d_fmt_2string(u32 format)
 	return "";
 } /* hdmi_get_single_video_3d_fmt_2string */
 
-ssize_t hdmi_get_video_3d_fmt_2string(u32 format, char *buf)
+ssize_t hdmi_get_video_3d_fmt_2string(u32 format, char *buf, u32 size)
 {
 	ssize_t ret, len = 0;
-	ret = snprintf(buf, PAGE_SIZE, "%s",
+	ret = scnprintf(buf, size, "%s",
 		hdmi_get_single_video_3d_fmt_2string(
 			format & FRAME_PACKING));
 	len += ret;
 
 	if (len && (format & TOP_AND_BOTTOM))
-		ret = snprintf(buf + len, PAGE_SIZE, ":%s",
+		ret = scnprintf(buf + len, size - len, ":%s",
 			hdmi_get_single_video_3d_fmt_2string(
 				format & TOP_AND_BOTTOM));
 	else
-		ret = snprintf(buf + len, PAGE_SIZE, "%s",
+		ret = scnprintf(buf + len, size - len, "%s",
 			hdmi_get_single_video_3d_fmt_2string(
 				format & TOP_AND_BOTTOM));
 	len += ret;
 
 	if (len && (format & SIDE_BY_SIDE_HALF))
-		ret = snprintf(buf + len, PAGE_SIZE, ":%s",
+		ret = scnprintf(buf + len, size - len, ":%s",
 			hdmi_get_single_video_3d_fmt_2string(
 				format & SIDE_BY_SIDE_HALF));
 	else
-		ret = snprintf(buf + len, PAGE_SIZE, "%s",
+		ret = scnprintf(buf + len, size - len, "%s",
 			hdmi_get_single_video_3d_fmt_2string(
 				format & SIDE_BY_SIDE_HALF));
 	len += ret;
