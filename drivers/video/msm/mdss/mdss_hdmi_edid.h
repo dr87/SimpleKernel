@@ -35,6 +35,5 @@ void *hdmi_edid_init(struct hdmi_edid_init_data *init_data);
 
 #ifdef CONFIG_SLIMPORT_ANX7808
 bool is_slimport_dp(void);
-bool is_slimport_vga(void);
 #endif
 #endif /* __HDMI_EDID_H__ */
