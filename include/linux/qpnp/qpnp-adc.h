@@ -1022,13 +1022,13 @@ int32_t qpnp_vadc_read(struct qpnp_vadc_chip *dev,
 				struct qpnp_vadc_result *result);
 
 #ifdef CONFIG_LGE_PM
-/**
- * qpnp_vadc_read_lge() - Performs ADC read on the channel.
- *                        lge api for avoid qct api changed.
- * @dev:	Structure device for qpnp vadc
- * @channel:	Input channel to perform the ADC read.
- * @result:	Structure pointer of type adc_chan_result
- *		in which the ADC read results are stored.
+/* 
+                                                           
+                                                            
+                                       
+                                                   
+                                                     
+                                             
  */
 int32_t qpnp_vadc_read_lge(enum qpnp_vadc_channels channel,
 				struct qpnp_vadc_result *result);
@@ -1495,12 +1495,12 @@ int32_t qpnp_iadc_read(struct qpnp_iadc_chip *dev,
 				enum qpnp_iadc_channels channel,
 				struct qpnp_iadc_result *result);
 #ifdef CONFIG_LGE_PM
-/**
- * qpnp_iadc_read_lge() - Performs ADC read on the channel.
- *                        lge api for avoid qct api changed.
- * @channel:	Input channel to perform the ADC read.
- * @result:	Structure pointer of type adc_chan_result
- *		in which the ADC read results are stored.
+/* 
+                                                           
+                                                            
+                                                   
+                                                     
+                                             
  */
 int32_t qpnp_iadc_read_lge(enum qpnp_iadc_channels channel,
 				struct qpnp_iadc_result *result);

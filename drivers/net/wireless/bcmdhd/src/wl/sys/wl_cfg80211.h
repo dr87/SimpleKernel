@@ -254,7 +254,7 @@ enum wl_iscan_state {
 	WL_ISCAN_STATE_SCANING
 };
 
-/* donlge escan state */
+/*                    */
 enum wl_escan_state {
     WL_ESCAN_STATE_IDLE,
     WL_ESCAN_STATE_SCANING

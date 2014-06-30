@@ -1,10 +1,10 @@
-/*********************************************************************
- *                
- * Filename:      lge_irtty-kddi.c
- * Version:       1.0
- * Description:   please refer to n_tty.c
- *     
- ********************************************************************/    
+/*                                                                    
+                  
+                                  
+                     
+                                         
+       
+                                                                    */    
 
 #include <linux/types.h>
 #include <linux/major.h>

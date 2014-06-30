@@ -3068,10 +3068,10 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 	}
 #ifdef CONFIG_MACH_LGE
 	/*
-	 * if "lge,board-use-prim-auxpcm-gpio" property is not exist, we
-	 * assume that it is used in board. if don't want auxpcm-gpio,
-	 * please use "lge,board-use-prim-auxpcm-gpio=<0>" in your dtsi.
-	 */
+                                                                 
+                                                               
+                                                                 
+  */
 	ret = of_property_read_u32(node, "lge,board-use-prim-auxpcm-gpio",
 			&prim_auxpcm_use_gpio);
 	if (ret == -EINVAL)
@@ -3093,10 +3093,10 @@ static __devinit int msm8974_asoc_machine_probe(struct platform_device *pdev)
 skip_prim:
 
 	/*
-	 * if "lge,board-use-sec-auxpcm-gpio" property is not exist, we
-	 * assume that it is used in board. if don't want auxpcm-gpio,
-	 * please use "lge,board-use-sec-auxpcm-gpio=<0>" in your dtsi.
-	 */
+                                                                
+                                                               
+                                                                
+  */
 	ret = of_property_read_u32(node, "lge,board-use-sec-auxpcm-gpio",
 			&sec_auxpcm_use_gpio);
 	if (ret == -EINVAL)

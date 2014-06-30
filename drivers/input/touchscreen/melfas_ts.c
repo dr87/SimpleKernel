@@ -1423,7 +1423,7 @@ static int melfas_ts_probe(struct i2c_client *client, const struct i2c_device_id
 	memset(ts->group_version, 0, 10*sizeof(char));
 	snprintf(ts->group_version, 10, "%c_%d", buf[2], buf[0]);
 #elif defined(CONFIG_USING_TOVIS_PANEL) /* d1lk */
-/*	if (lge_get_board_revno() >= HW_REV_C) { //Check it later by andrew*/
+/*                                                                    */
 #ifdef andrew_download
 		if (buf[0] < ts->pdata->fw_ver || buf[0] == 0xF0 || buf[0] == 0xF0) {   /* update only Rev C ITO case */
 			MELFAS_TS_DPRINTK(MELFAS_TS_DEBUG_PROBE, KERN_INFO, "[TOUCH] : download start \n");
@@ -1464,11 +1464,11 @@ static int melfas_ts_probe(struct i2c_client *client, const struct i2c_device_id
 
 		ts->version = buf[FW_VERSION_ADDR];
 	}
-	/* LGE_CHANGE
-	 * 2012-06-09, sangyeol.ryu@lge.com
-	 * use double resoultion for touch drag performance
-	 * in case of over 0x13(touch sw version)
-	 */
+	/*           
+                                    
+                                                    
+                                          
+  */
 	if (ts->version >= 0x13) {
 		m = 2;
 	}

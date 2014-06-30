@@ -1084,13 +1084,19 @@ config LGE_Z_TOUCHSCREEN
 	  For difference of Z-prj touch
 	  - its own FW version.
 
+config LGE_SECURITY_KNOCK_ON
+	default n
+	bool "Use LGE SECURITY KNOCK ON"
+	help
+	  For LGE SECURITY KNOCK ON
+
 config LGE_VU3_TOUCHSCREEN
 	default n
 	bool "Use LGE VU3-prj touch"
 	help
 	  For difference of Z-prj touch
 	  - its own FW version.
-	  
+
 config SECURE_TOUCH
 	bool "Secure Touch"
 	depends on TOUCHSCREEN_ATMEL_MXT

@@ -50,13 +50,8 @@
 #define STATE_ERROR                 4   /* error from completion routine */
 
 /* number of tx and rx requests to allocate */
-#ifdef CONFIG_USB_G_LGE_ANDROID
-#define MTP_TX_REQ_MAX 16
-#define MTP_RX_REQ_MAX 8
-#else
 #define MTP_TX_REQ_MAX 8
 #define RX_REQ_MAX 2
-#endif
 #define INTR_REQ_MAX 5
 
 /* ID for Microsoft MTP OS String */
@@ -72,13 +67,13 @@
 #define MTP_RESPONSE_OK             0x2001
 #define MTP_RESPONSE_DEVICE_BUSY    0x2019
 
-unsigned int lg_mtp_rx_req_len = MTP_BULK_BUFFER_SIZE;
+unsigned int lg_mtp_rx_req_len = 65536;
 module_param(lg_mtp_rx_req_len, uint, S_IRUGO | S_IWUSR);
 
 unsigned int lg_mtp_tx_req_len = MTP_BULK_BUFFER_SIZE;
 module_param(lg_mtp_tx_req_len, uint, S_IRUGO | S_IWUSR);
 
-unsigned int lg_mtp_tx_reqs = MTP_TX_REQ_MAX;
+unsigned int lg_mtp_tx_reqs = 16;
 module_param(lg_mtp_tx_reqs, uint, S_IRUGO | S_IWUSR);
 
 static const char lg_mtp_shortname[] = "lg_mtp_usb";
@@ -277,11 +272,11 @@ static u8 lg_mtp_os_string[] = {
 };
 
 #ifdef NOT_CONFIG_USB_G_LGE_ANDROID
-/* LGE_CHANGE
- * MS Ext Desciptor for MTP and adb (to use in testing driver).
- * NOTE: this remains for reference code about MTP setting with ADB enabled.
- * Therefore we do not use this officially(so NOT_ prefix is used).
- * 2011-02-09, hyunhui.park@lge.com
+/*           
+                                                               
+                                                                            
+                                                                   
+                                   
  */
 
 /* MTP Extended Configuration Descriptor */
@@ -480,11 +475,7 @@ retry_tx_alloc:
 		lg_mtp_tx_reqs = 4;
 
 	/* now allocate requests for our endpoints */
-#ifdef CONFIG_USB_G_LGE_ANDROID
-	for (i = 0; i < MTP_TX_REQ_MAX; i++) {
-#else
 	for (i = 0; i < lg_mtp_tx_reqs; i++) {
-#endif
 		req = lg_mtp_request_new(dev->ep_in, lg_mtp_tx_req_len);
 		if (!req) {
 			if (lg_mtp_tx_req_len <= MTP_BULK_BUFFER_SIZE)
@@ -509,11 +500,7 @@ retry_tx_alloc:
 		lg_mtp_rx_req_len = MTP_BULK_BUFFER_SIZE;
 
 retry_rx_alloc:
-#ifdef CONFIG_USB_G_LGE_ANDROID
-	for (i = 0; i < MTP_RX_REQ_MAX; i++) {
-#else
 	for (i = 0; i < RX_REQ_MAX; i++) {
-#endif
 		req = lg_mtp_request_new(dev->ep_out, lg_mtp_rx_req_len);
 		if (!req) {
 			if (lg_mtp_rx_req_len <= MTP_BULK_BUFFER_SIZE)
@@ -861,11 +848,7 @@ static void lg_mtp_receive_file_work(struct work_struct *data)
 		if (count > 0) {
 			/* queue a request */
 			read_req = dev->rx_req[cur_buf];
-#ifdef CONFIG_USB_G_LGE_ANDROID
-			cur_buf = (cur_buf + 1) % MTP_RX_REQ_MAX;
-#else
 			cur_buf = (cur_buf + 1) % RX_REQ_MAX;
-#endif
 
 			/* some h/w expects size to be aligned to ep's MTU */
 			read_req->length = lg_mtp_rx_req_len;
@@ -1256,11 +1239,7 @@ lg_mtp_function_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	while ((req = lg_mtp_req_get(dev, &dev->tx_idle)))
 		lg_mtp_request_free(req, dev->ep_in);
-#ifdef CONFIG_USB_G_LGE_ANDROID
-	for (i = 0; i < MTP_RX_REQ_MAX; i++)
-#else
 	for (i = 0; i < RX_REQ_MAX; i++)
-#endif
 		lg_mtp_request_free(dev->rx_req[i], dev->ep_out);
 	while ((req = lg_mtp_req_get(dev, &dev->intr_idle)))
 		lg_mtp_request_free(req, dev->ep_intr);

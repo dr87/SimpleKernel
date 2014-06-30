@@ -106,11 +106,11 @@ struct max17048_chip {
 
 #ifdef CONFIG_LGE_PM
 static struct max17048_chip *ref;
-/* TODO : lge_power_test_flash must be implemented charger side.
-*  it will be changed after.
+/*                                                              
+                            
 */
 #ifndef CONFIG_LGE_PM
-/* extern int lge_power_test_flag; */
+/*                                 */
 #else
 int lge_power_test_flag = 1;
 #endif

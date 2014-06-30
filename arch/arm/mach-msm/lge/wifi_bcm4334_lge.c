@@ -497,7 +497,7 @@ const struct cntry_locales_custom bcm_wifi_translate_custom_table[] = {
 	{"DK", "GB", 0}, /* Denmark */
 	{"DM", "BR", 0}, /* Dominica */
 	{"DO", "BR", 0}, /* Dominican Republic */
-	{"DZ", "KW", 1}, /* Algeria */
+	{"DZ", "KW", 1}, /*         */
 	{"EC", "BR", 0}, /* Ecuador */
 	{"EE", "GB", 0}, /* Estonia */
 	{"EG", "RU", 1}, /* Egypt */

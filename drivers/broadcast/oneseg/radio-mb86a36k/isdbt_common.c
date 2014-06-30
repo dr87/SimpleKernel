@@ -17,7 +17,7 @@
 
 #include <mach/gpio.h>
 
-//#include "../../../../arch/arm/mach-msm/lge/l1_dcm/board-l1_dcm.h"
+//                                                                  
 #include "isdbt_common.h"
 
 static unsigned char isdbt_isr_sig=0;

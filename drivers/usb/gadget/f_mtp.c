@@ -50,13 +50,8 @@
 #define STATE_ERROR                 4   /* error from completion routine */
 
 /* number of tx and rx requests to allocate */
-#ifdef CONFIG_USB_G_LGE_ANDROID
-#define MTP_TX_REQ_MAX 16
-#define MTP_RX_REQ_MAX 8
-#else
 #define MTP_TX_REQ_MAX 8
 #define RX_REQ_MAX 2
-#endif
 #define INTR_REQ_MAX 5
 
 /* ID for Microsoft MTP OS String */
@@ -72,13 +67,21 @@
 #define MTP_RESPONSE_OK             0x2001
 #define MTP_RESPONSE_DEVICE_BUSY    0x2019
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
+unsigned int mtp_rx_req_len = 65536;
+#else
 unsigned int mtp_rx_req_len = MTP_BULK_BUFFER_SIZE;
+#endif
 module_param(mtp_rx_req_len, uint, S_IRUGO | S_IWUSR);
 
 unsigned int mtp_tx_req_len = MTP_BULK_BUFFER_SIZE;
 module_param(mtp_tx_req_len, uint, S_IRUGO | S_IWUSR);
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
+unsigned int mtp_tx_reqs = 16;
+#else
 unsigned int mtp_tx_reqs = MTP_TX_REQ_MAX;
+#endif
 module_param(mtp_tx_reqs, uint, S_IRUGO | S_IWUSR);
 
 static const char mtp_shortname[] = "mtp_usb";
@@ -105,11 +108,7 @@ struct mtp_dev {
 	wait_queue_head_t read_wq;
 	wait_queue_head_t write_wq;
 	wait_queue_head_t intr_wq;
-#ifdef CONFIG_USB_G_LGE_ANDROID
-	struct usb_request *rx_req[MTP_RX_REQ_MAX];
-#else
 	struct usb_request *rx_req[RX_REQ_MAX];
-#endif
 	int rx_done;
 
 	/* for processing MTP_SEND_FILE, MTP_RECEIVE_FILE and
@@ -331,11 +330,11 @@ struct mtp_ext_config_desc_function {
 };
 
 #ifdef NOT_CONFIG_USB_G_LGE_ANDROID
-/* LGE_CHANGE
- * MS Ext Desciptor for MTP and adb (to use in testing driver).
- * NOTE: this remains for reference code about MTP setting with ADB enabled.
- * Therefore we do not use this officially(so NOT_ prefix is used).
- * 2011-02-09, hyunhui.park@lge.com
+/*           
+                                                               
+                                                                            
+                                                                   
+                                   
  */
 
 /* MTP Extended Configuration Descriptor */
@@ -538,17 +537,12 @@ static int mtp_create_bulk_endpoints(struct mtp_dev *dev,
 	ep->driver_data = dev;		/* claim the endpoint */
 	dev->ep_intr = ep;
 
-/* FixMe AU_106 */
 retry_tx_alloc:
 	if (mtp_tx_req_len > MTP_BULK_BUFFER_SIZE)
 		mtp_tx_reqs = 4;
 
 	/* now allocate requests for our endpoints */
-#ifdef CONFIG_USB_G_LGE_ANDROID
-	for (i = 0; i < MTP_TX_REQ_MAX; i++) {
-#else
 	for (i = 0; i < mtp_tx_reqs; i++) {
-#endif
 		req = mtp_request_new(dev->ep_in, mtp_tx_req_len);
 		if (!req) {
 			if (mtp_tx_req_len <= MTP_BULK_BUFFER_SIZE)
@@ -573,11 +567,7 @@ retry_tx_alloc:
 		mtp_rx_req_len = MTP_BULK_BUFFER_SIZE;
 
 retry_rx_alloc:
-#ifdef CONFIG_USB_G_LGE_ANDROID
-	for (i = 0; i < MTP_RX_REQ_MAX; i++) {
-#else
 	for (i = 0; i < RX_REQ_MAX; i++) {
-#endif
 		req = mtp_request_new(dev->ep_out, mtp_rx_req_len);
 		if (!req) {
 			if (mtp_rx_req_len <= MTP_BULK_BUFFER_SIZE)
@@ -925,11 +915,7 @@ static void receive_file_work(struct work_struct *data)
 		if (count > 0) {
 			/* queue a request */
 			read_req = dev->rx_req[cur_buf];
-#ifdef CONFIG_USB_G_LGE_ANDROID
-			cur_buf = (cur_buf + 1) % MTP_RX_REQ_MAX;
-#else
 			cur_buf = (cur_buf + 1) % RX_REQ_MAX;
-#endif
 
 			/* some h/w expects size to be aligned to ep's MTU */
 			read_req->length = mtp_rx_req_len;
@@ -1140,7 +1126,7 @@ static int mtp_open(struct inode *ip, struct file *fp)
         printk(KERN_INFO "%s : Set Config number is %d\n", __func__, nSetConfig);
         return -EACCES;
     }
-#endif //CONFIG_USB_G_LGE_MULTIPLE_CONFIGURATION
+#endif //                                       
 	if (mtp_lock(&_mtp_dev->open_excl))
 		return -EBUSY;
 
@@ -1326,11 +1312,7 @@ mtp_function_unbind(struct usb_configuration *c, struct usb_function *f)
 
 	while ((req = mtp_req_get(dev, &dev->tx_idle)))
 		mtp_request_free(req, dev->ep_in);
-#ifdef CONFIG_USB_G_LGE_ANDROID
-	for (i = 0; i < MTP_RX_REQ_MAX; i++)
-#else
 	for (i = 0; i < RX_REQ_MAX; i++)
-#endif
 		mtp_request_free(dev->rx_req[i], dev->ep_out);
 	while ((req = mtp_req_get(dev, &dev->intr_idle)))
 		mtp_request_free(req, dev->ep_intr);
