@@ -227,6 +227,7 @@ static unsigned int freq_to_above_hispeed_delay(unsigned int freq)
 	return ret;
 }
 
+#ifdef DONTBUILD
 static unsigned int freq_to_targetload(unsigned int freq)
 {
 	int i;
@@ -242,6 +243,7 @@ static unsigned int freq_to_targetload(unsigned int freq)
 	spin_unlock_irqrestore(&target_loads_lock, flags);
 	return ret;
 }
+#endif
 
 static unsigned int freq_to_timer_rate(unsigned int freq)
 {
@@ -298,6 +300,7 @@ static unsigned int freq_to_min_sample_time(unsigned int freq)
  * target load given the current load.
  */
 
+#ifdef DONTBUILD
 static unsigned int choose_freq(
 	struct cpufreq_interactive_cpuinfo *pcpu, unsigned int loadadjfreq)
 {
@@ -382,6 +385,7 @@ static unsigned int choose_freq(
 
 	return freq;
 }
+#endif
 
 static unsigned int calc_freq(struct cpufreq_interactive_cpuinfo *pcpu, 
 	unsigned int load)
